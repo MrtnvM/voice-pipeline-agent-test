@@ -1,6 +1,8 @@
 import logging
 
 from dotenv import load_dotenv
+load_dotenv(dotenv_path=".env.local")
+
 from livekit.agents import (
     AutoSubscribe,
     JobContext,
@@ -17,7 +19,6 @@ from livekit.plugins import cartesia, openai, deepgram, silero, turn_detector
 import langgraph_plugin 
 from graph import graph
 
-load_dotenv(dotenv_path=".env.local")
 logger = logging.getLogger("voice-agent")
 
 

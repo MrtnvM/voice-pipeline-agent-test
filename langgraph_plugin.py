@@ -462,81 +462,33 @@ class LLMStream(llm.LLMStream):
             chatbot = chunk["chatbot"]
             if "messages" in chatbot:
                 messages: list[AnyMessage] = chatbot["messages"]
+
                 for msg in messages:
+                    # Handle text content
                     if isinstance(msg, AIMessage):
                         msg: AIMessage = cast(AIMessage, msg)
-                        return llm.ChatChunk(
-                            request_id=self._request_id,
-                            choices=[
-                                llm.Choice(
-                                    delta=llm.ChoiceDelta(content=msg.content, role="assistant")
-                                )
-                            ],
-                        )
-        
-        # Handle text content
-        if hasattr(chunk, "content") and isinstance(chunk.content, str) and chunk.content:
-            return llm.ChatChunk(
-                request_id=self._request_id,
-                choices=[
-                    llm.Choice(
-                        delta=llm.ChoiceDelta(content=chunk.content, role="assistant")
-                    )
-                ],
-            )
-        
-        # Extract token usage if available
-        if hasattr(chunk, "usage"):
-            usage = getattr(chunk, "usage", {})
-            if hasattr(usage, "prompt_tokens"):
-                self._input_tokens = usage.prompt_tokens
-            if hasattr(usage, "completion_tokens"):
-                self._output_tokens = usage.completion_tokens
-                
-        # Handle text content
-        if hasattr(chunk, "content") and isinstance(chunk.content, str) and chunk.content:
-            return llm.ChatChunk(
-                request_id=self._request_id,
-                choices=[
-                    llm.Choice(
-                        delta=llm.ChoiceDelta(content=chunk.content, role="assistant")
-                    )
-                ],
-            )
-        
-        # Handle tool calls
-        if hasattr(chunk, "tool_calls") and chunk.tool_calls:
-            # Make sure we have a function context
-            if not self._fnc_ctx:
-                logger.warning("Received tool call but no function context available")
-                return None
-                
-            tool_calls_info = []
-            for tool_call in chunk.tool_calls:
-                # Create function info
-                tool_id = getattr(tool_call, "id", f"tc-{id(tool_call)}")
-                fnc_name = getattr(tool_call.function, "name", "")
-                fnc_args = getattr(tool_call.function, "arguments", "{}")
-                
-                fnc_info = _create_ai_function_info(
-                    self._fnc_ctx,
-                    tool_id,
-                    fnc_name,
-                    fnc_args,
-                )
-                tool_calls_info.append(fnc_info)
-                self._function_calls_info.append(fnc_info)
+                        
+                        # Handle tokens usage
+                        content = msg.content
+                        if isinstance(content, str):
+                            return llm.ChatChunk(
+                                request_id=self._request_id,
+                                choices=[
+                                    llm.Choice(
+                                        delta=llm.ChoiceDelta(content=msg.content, role="assistant")
+                                    )
+                                ],
+                            )
+                        elif isinstance(content, list):
+                            for item in content:
+                                if "text" in item:
+                                    return llm.ChatChunk(
+                                        request_id=self._request_id,
+                                        choices=[
+                                            llm.Choice(
+                                                delta=llm.ChoiceDelta(content=item["text"], role="assistant")
+                                            )
+                                        ],
+                                    )
 
-            return llm.ChatChunk(
-                request_id=self._request_id,
-                choices=[
-                    llm.Choice(
-                        delta=llm.ChoiceDelta(
-                            role="assistant", tool_calls=tool_calls_info
-                        ),
-                    )
-                ],
-            )
-
-        # Return None if we couldn't extract anything useful
         return None
